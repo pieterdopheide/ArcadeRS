@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Pieter Dopheide <you@example.com>"]
 
 [dependencies]
-sdl2 = "0.13"
+sdl2 = "0.23"
+sdl2_image = "0.23.0"
 

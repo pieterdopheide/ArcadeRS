@@ -1,6 +1,7 @@
 #[macro_use]
 mod events;
 pub mod data;
+pub mod gfx;
 
 use sdl2::render::Renderer;
 
@@ -24,6 +25,13 @@ pub struct Phi<'window> {
 }
 
 impl<'window> Phi<'window> {
+    fn new(events: Events, renderer: Renderer<'window>) -> Phi<'window> {
+        Phi {
+            events: events,
+            renderer: renderer,
+        }
+    }
+
     pub fn output_size(&self) -> (f64, f64) {
         let (w, h) = self.renderer.output_size().unwrap();
         (w as f64, h as f64)
@@ -46,6 +54,7 @@ where F: Fn(&mut Phi) -> Box<View> {
     let sdl_context = ::sdl2::init().unwrap();
     let video = sdl_context.video().unwrap();
     let mut timer = sdl_context.timer().unwrap();
+    let _image_context = ::sdl2_image::init(::sdl2_image::INIT_PNG).unwrap();
 
     // Create the window
     let window = video.window("ArcadeRS Shooter", 800, 600)
@@ -53,12 +62,11 @@ where F: Fn(&mut Phi) -> Box<View> {
         .build().unwrap();
 
     // Create the context
-    let mut context = Phi {
-        events: Events::new(sdl_context.event_pump().unwrap()),
-        renderer: window.renderer()
+    let mut context = Phi::new(
+        Events::new(sdl_context.event_pump().unwrap()),
+        window.renderer()
             .accelerated()
-            .build().unwrap(),
-    };
+            .build().unwrap());
 
     // Create the default view
     let mut current_view = init(&mut context);
@@ -96,7 +104,7 @@ where F: Fn(&mut Phi) -> Box<View> {
 
         context.events.pump(&mut context.renderer);
 
-        match current_view.render(&mut context, 0.01) {
+        match current_view.render(&mut context, elapsed) {
             ViewAction::None => context.renderer.present(),
             ViewAction::Quit => break,
             ViewAction::ChangeView(new_view) => current_view = new_view,

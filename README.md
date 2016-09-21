@@ -6,3 +6,5 @@ Made following the ArcadeRS tutorial at https://jadpole.github.io/arcaders/arcad
 Changed the version of the sdl2 dependency to 0.23.0, the latest version, and did the same for the sdl2_image dependency.
 Having all sdl2 dependencies on the same version to prevent errors. 
 
+Followed part '1.9: Main menu' of the tutorial to the end. However, a lot has changed with the updates of the sdl2 dependencies, causing the code in the tutorial to not compile. The work for the main menu has been committed to the branch 'mainmenu' and will be merged after these problems are solved.
+

@@ -97,7 +97,7 @@ impl View for MainMenuView {
         let margin_h = 10.0;
 
         // Render the border of the colored box which holds the labels
-        phi.renderer.set_draw_colors(Color::RGB(70, 15, 70));
+        phi.renderer.set_draw_color(Color::RGB(70, 15, 70));
         phi.renderer.fill_rect(Rectangle {
             w: box_w + border_width * 2.0,
             h: box_h + border_width * 2.0 + margin_h * 2.0,

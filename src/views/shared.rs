@@ -59,7 +59,7 @@ impl BgSet {
             front: Background {
                 pos: 0.0,
                 vel: 80.0,
-                sprite: Sprite::load(renderer, "assets/starFg.png").unwrap(),
+                sprite: Sprite::load(renderer, "assets/starFG.png").unwrap(),
             },
         }
     }

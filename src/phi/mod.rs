@@ -47,21 +47,26 @@ impl<'window> Phi<'window> {
 
     // Renders a string of text as a sprite using the provided parameters
     pub fn ttf_str_sprite(&mut self, text: &str, font_path: &'static str, size: i32, color: Color) -> Option<Sprite> {
+/*
         if let Some(font) = self.cached_fonts.get(&(font_path, size)) {
-//            return font.render(text, ::sdl2_ttf::blended(color)).ok()
             return font.render(text).blended(color).ok()
                 .and_then(|surface| self.renderer.create_texture_from_surface(&surface).ok())
                 .map(Sprite::new)
         }
 
-//        ::sdl2_ttf::Font::from_file(Path::new(font_path), size).ok()
         let ttf_context = ::sdl2_ttf::init().unwrap();
         ttf_context.load_font(Path::new(font_path), size as u16).ok()
-//        ::sdl2_ttf::Sdl2TtfContext::load_font(Path::new(font_path), size).ok()
             .and_then(|font| {
                 self.cached_fonts.insert((font_path, size), font);
                 self.ttf_str_sprite(text, font_path, size, color)
             })
+*/
+
+        let ttf_context = ::sdl2_ttf::init().unwrap();
+        let mut font = ttf_context.load_font(Path::new(font_path), size as u16).unwrap();
+        font.render(text).blended(color).ok()
+            .and_then(|surface| self.renderer.create_texture_from_surface(&surface).ok())
+            .map(Sprite::new)
     }
 }
 
@@ -82,7 +87,7 @@ where F: Fn(&mut Phi) -> Box<View> {
     let video = sdl_context.video().unwrap();
     let mut timer = sdl_context.timer().unwrap();
     let _image_context = ::sdl2_image::init(::sdl2_image::INIT_PNG).unwrap();
-    let _ttf_context = ::sdl2_ttf::init().unwrap();
+//    let _ttf_context = ::sdl2_ttf::init().unwrap();
 
     // Create the window
     let window = video.window("ArcadeRS Shooter", 800, 600)

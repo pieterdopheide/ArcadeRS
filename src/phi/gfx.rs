@@ -27,7 +27,10 @@ impl Sprite {
     }
 
     pub fn load(renderer: &Renderer, path: &str) -> Option<Sprite> {
-        renderer.load_texture(Path::new(path)).ok().map(Sprite::new)
+        match renderer.load_texture(Path::new(path)) {
+            Ok(t) => Some(Sprite::new(t)),
+            Err(e) => panic!("Error: {}", e)
+        }
     }
 
     pub fn size(&self) -> (f64, f64) {

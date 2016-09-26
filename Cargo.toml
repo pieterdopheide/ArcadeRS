@@ -7,4 +7,5 @@ authors = ["Pieter Dopheide <you@example.com>"]
 sdl2 = "0.23"
 sdl2_image = "0.23.0"
 sdl2_ttf = "0.23.0"
+rand = "0.3"
 

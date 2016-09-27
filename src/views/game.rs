@@ -1,6 +1,6 @@
 use phi::{Phi, View, ViewAction};
 use phi::data::{MaybeAlive, Rectangle};
-use phi::gfx::{AnimatedSprite, CopySprite, Sprite};
+use phi::gfx::{AnimatedSprite, AnimatedSpriteDescr, CopySprite, Sprite};
 use sdl2::pixels::Color;
 use views::shared::BgSet;
 
@@ -18,6 +18,14 @@ const ASTEROIDS_WIDE: usize = 21;
 const ASTEROIDS_HIGH: usize = 7;
 const ASTEROIDS_TOTAL: usize = ASTEROIDS_WIDE * ASTEROIDS_HIGH - 4;
 const ASTEROID_SIDE: f64 = 96.0;
+
+const EXPLOSION_PATH: &'static str = "assets/explosion.png";
+const EXPLOSIONS_WIDE: usize = 5;
+const EXPLOSIONS_HIGH: usize = 4;
+const EXPLOSIONS_TOTAL: usize = 17;
+const EXPLOSION_SIDE: f64 = 96.0;
+const EXPLOSION_FPS: f64 = 16.0;
+const EXPLOSION_DURATION: f64 = 1.0 / EXPLOSION_FPS * EXPLOSIONS_TOTAL as f64;
 
 const DEBUG: bool = false;
 
@@ -277,27 +285,16 @@ impl Asteroid {
 */
 
     fn factory(phi: &mut Phi) -> AsteroidFactory {
-        let asteroid_spritesheet = Sprite::load(&mut phi.renderer, ASTEROID_PATH).unwrap();
-        let mut asteroid_sprites = Vec::with_capacity(ASTEROIDS_TOTAL);
-
-        for yth in 0..ASTEROIDS_HIGH {
-            for xth in 0..ASTEROIDS_WIDE {
-                if ASTEROIDS_WIDE * yth + xth >= ASTEROIDS_TOTAL {
-                    break;
-                }
-
-                asteroid_sprites.push(
-                    asteroid_spritesheet.region(Rectangle {
-                        w: ASTEROID_SIDE,
-                        h: ASTEROID_SIDE,
-                        x: ASTEROID_SIDE * xth as f64,
-                        y: ASTEROID_SIDE * yth as f64,
-                    }).unwrap());
-            }
-        }
-
         AsteroidFactory {
-            sprite: AnimatedSprite::with_fps(asteroid_sprites, 1.0),
+            sprite: AnimatedSprite::with_fps(
+                        AnimatedSprite::load_frames(phi, AnimatedSpriteDescr {
+                            image_path: ASTEROID_PATH,
+                            total_frames: ASTEROIDS_TOTAL,
+                            frames_high: ASTEROIDS_HIGH,
+                            frames_wide: ASTEROIDS_WIDE,
+                            frame_w: ASTEROID_SIDE,
+                            frame_h: ASTEROID_SIDE,
+                        }), 1.0),
         }
     }
 
@@ -395,11 +392,68 @@ impl AsteroidFactory {
     }
 }
 
+struct Explosion {
+    sprite: AnimatedSprite,
+    rect: Rectangle,
+    alive_since: f64,
+}
+
+impl Explosion {
+    fn factory(phi: &mut Phi) -> ExplosionFactory {
+        ExplosionFactory {
+            sprite: AnimatedSprite::with_fps(
+                        AnimatedSprite::load_frames(phi, AnimatedSpriteDescr {
+                            image_path: EXPLOSION_PATH,
+                            total_frames: EXPLOSIONS_TOTAL,
+                            frames_high: EXPLOSIONS_HIGH,
+                            frames_wide: EXPLOSIONS_WIDE,
+                            frame_w: EXPLOSION_SIDE,
+                            frame_h: EXPLOSION_SIDE,
+                        }), EXPLOSION_FPS),
+        }
+    }
+
+    fn update(mut self, dt: f64) -> Option<Explosion> {
+        self.alive_since += dt;
+        self.sprite.add_time(dt);
+
+        if self.alive_since >= EXPLOSION_DURATION {
+            None
+        } else {
+            Some(self)
+        }
+    }
+
+    fn render(&self, phi: &mut Phi) {
+        phi.renderer.copy_sprite(&self.sprite, self.rect);
+    }
+}
+
+struct ExplosionFactory {
+    sprite: AnimatedSprite,
+}
+
+impl ExplosionFactory {
+    fn at_center(&self, center: (f64, f64)) -> Explosion {
+        // FPS in [10.0, 30.0)
+        let mut sprite = self.sprite.clone();
+
+        Explosion {
+            sprite: sprite,
+            rect: Rectangle::with_size(EXPLOSION_SIDE, EXPLOSION_SIDE)
+                .center_at(center),
+            alive_since: 0.0,
+        }
+    }
+}
+
 pub struct GameView {
     player: Ship,
     bullets: Vec<Box<Bullet>>,
     asteroids: Vec<Asteroid>,
     asteroid_factory: AsteroidFactory,
+    explosions: Vec<Explosion>,
+    explosion_factory: ExplosionFactory,
     bg: BgSet,
 }
 
@@ -443,6 +497,8 @@ impl GameView {
             bullets: vec![],
             asteroids: vec![],
             asteroid_factory: Asteroid::factory(phi),
+            explosions: vec![],
+            explosion_factory: Explosion::factory(phi),
             bg: bg,
         }
     }
@@ -529,11 +585,18 @@ impl View for GameView {
             .filter_map(|bullet| bullet.update(phi, elapsed))
             .collect();
 
-        // Update the asteroid
+        // Update the asteroids
         self.asteroids =
             ::std::mem::replace(&mut self.asteroids, vec![])
             .into_iter()
             .filter_map(|asteroid| asteroid.update(elapsed))
+            .collect();
+
+        // Update the explosions
+        self.explosions =
+            ::std::mem::replace(&mut self.explosions, vec![])
+            .into_iter()
+            .filter_map(|explosion| explosion.update(elapsed))
             .collect();
 
         // Collision detection
@@ -567,6 +630,10 @@ impl View for GameView {
                 if asteroid_alive {
                     Some(asteroid)
                 } else {
+                    // Spwan an explosion wherever an asteroid was destroyed
+                    self.explosions.push(
+                        self.explosion_factory.at_center(
+                            asteroid.rect().center()));
                     None
                 }
             })
@@ -616,6 +683,10 @@ impl View for GameView {
         // Render the asteroid
         for asteroid in &self.asteroids {
             asteroid.render(phi);
+        }
+
+        for explosion in &self.explosions {
+            explosion.render(phi);
         }
 
         // Render the foreground

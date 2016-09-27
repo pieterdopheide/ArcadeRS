@@ -326,23 +326,23 @@ impl Asteroid {
     }
 }
 
-pub struct ShipView {
+pub struct GameView {
     player: Ship,
     bullets: Vec<Box<Bullet>>,
     asteroid: Asteroid,
     bg: BgSet,
 }
 
-impl ShipView {
-    // We temporarily keep this so that we can instanciate 'ShipView' in
+impl GameView {
+    // We temporarily keep this so that we can instanciate 'GameView' in
     // 'main' while developing it further
     #[allow(dead_code)]
-    pub fn new(phi: &mut Phi) -> ShipView {
+    pub fn new(phi: &mut Phi) -> GameView {
         let bg = BgSet::new(&mut phi.renderer);
-        ShipView::with_backgrounds(phi, bg)
+        GameView::with_backgrounds(phi, bg)
     }
 
-    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> ShipView {
+    pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> GameView {
         let spritesheet = Sprite::load(&mut phi.renderer, "assets/spaceship.png").unwrap();
         let mut sprites = Vec::with_capacity(9);
 
@@ -357,7 +357,7 @@ impl ShipView {
             }
         }
 
-        ShipView {
+        GameView {
             player: Ship {
                 rect: Rectangle {
                     x: 64.0,
@@ -377,7 +377,7 @@ impl ShipView {
     }
 }
 
-impl View for ShipView {
+impl View for GameView {
     fn render(&mut self, phi: &mut Phi, elapsed: f64) -> ViewAction {
         if phi.events.now.quit {
             return ViewAction::Quit;

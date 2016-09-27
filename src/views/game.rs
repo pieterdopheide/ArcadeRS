@@ -3,15 +3,12 @@ use phi::data::{MaybeAlive, Rectangle};
 use phi::gfx::{AnimatedSprite, AnimatedSpriteDescr, CopySprite, Sprite};
 use sdl2::pixels::Color;
 use views::shared::BgSet;
+use views::bullets::*;
 
 const PLAYER_SPEED: f64 = 180.0;
-
-const SHIP_W: f64 = 43.0;
-const SHIP_H: f64 = 39.0;
-
-const BULLET_SPEED: f64 = 240.0;
-const BULLET_W: f64 = 8.0;
-const BULLET_H: f64 = 4.0;
+const PLAYER_PATH: &'static str = "assets/spaceship.png";
+const PLAYER_W: f64 = 43.0;
+const PLAYER_H: f64 = 39.0;
 
 const ASTEROID_PATH: &'static str = "assets/asteroid.png";
 const ASTEROIDS_WIDE: usize = 21;
@@ -30,7 +27,7 @@ const EXPLOSION_DURATION: f64 = 1.0 / EXPLOSION_FPS * EXPLOSIONS_TOTAL as f64;
 const DEBUG: bool = false;
 
 #[derive(Clone, Copy)]
-enum ShipFrame {
+enum PlayerFrame {
     UpNorm = 0,
     UpFast = 1,
     UpSlow = 2,
@@ -42,219 +39,134 @@ enum ShipFrame {
     DownSlow = 8
 }
 
-#[derive(Clone, Copy)]
-enum CannonType {
-    RectBullet,
-    SineBullet { amplitude: f64, angular_vel: f64 },
-    DivergentBullet { a: f64, b: f64 },
-}
-
-struct SineBullet {
-    pos_x: f64,
-    origin_y: f64,
-    amplitude: f64,
-    angular_vel: f64,
-    total_time: f64,
-}
-
-impl Bullet for SineBullet {
-    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>> {
-        self.total_time += dt;
-        self.pos_x += BULLET_SPEED * dt;
-
-        let (w, _) = phi.output_size();
-
-        if self.rect().x > w {
-            None
-        } else {
-            Some(self)
-        }
-    }
-
-    fn render(&self, phi: &mut Phi) {
-        phi.renderer.set_draw_color(Color::RGB(230, 230, 30));
-        phi.renderer.fill_rect(self.rect().to_sdl().unwrap());
-    }
-
-    fn rect(&self) -> Rectangle {
-        let dy = self.amplitude * f64::sin(self.angular_vel * self.total_time);
-        Rectangle {
-            x: self.pos_x,
-            y: self.origin_y + dy,
-            w: BULLET_W,
-            h: BULLET_H,
-        }
-    }
-}
-
-// Bullet which follows a vertical trajectory given by:
-// a * ((t / b)^3 - (t / b)^2)
-struct DivergentBullet {
-    pos_x: f64,
-    origin_y: f64,
-    a: f64, // Influences the bump's height
-    b: f64, // Influences the bump's width
-    total_time: f64,
-}
-
-impl Bullet for DivergentBullet {
-    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>> {
-        self.total_time += dt;
-        self.pos_x += BULLET_SPEED * dt;
-
-        let (w, h) = phi.output_size();
-        let rect = self.rect();
-
-        if rect.x > w || rect.x < 0.0 ||
-           rect.y > h || rect.y < 0.0 {
-                None
-            } else {
-                Some(self)
-            }
-    }
-
-    fn render(&self, phi: &mut Phi) {
-        phi.renderer.set_draw_color(Color::RGB(230, 230, 30));
-        phi.renderer.fill_rect(self.rect().to_sdl().unwrap());
-    }
-
-    fn rect(&self) -> Rectangle {
-        let dy = self.a * 
-            ((self.total_time / self.b).powi(3) -
-             (self.total_time / self.b).powi(2));
-
-        Rectangle {
-            x: self.pos_x,
-            y: self.origin_y + dy,
-            w: BULLET_W,
-            h: BULLET_H,
-        }
-    }
-}
-
-struct Ship {
+struct Player {
     rect: Rectangle,
     sprites: Vec<Sprite>,
-    current: ShipFrame,
+    current: PlayerFrame,
     cannon: CannonType,
 }
 
-impl Ship {
-    fn spawn_bullets(&self) -> Vec<Box<Bullet>> {
-        let cannons_x = self.rect.x + 30.0;
-        let cannon1_y = self.rect.y + 6.0;
-        let cannon2_y = self.rect.y + SHIP_H - 10.0;
+impl Player {
+    pub fn new(phi: &mut Phi) -> Player {
+        // Get the spacehip's sprites
+        let spritesheet = Sprite::load(&mut phi.renderer, PLAYER_PATH).unwrap();
+        let mut sprites = Vec::with_capacity(9);
 
-        match self.cannon {
-            CannonType::RectBullet =>
-                vec![
-                    Box::new(RectBullet {
-                        rect: Rectangle {
-                            x: cannons_x,
-                            y: cannon1_y,
-                            w: BULLET_W,
-                            h: BULLET_H,
-                        }
-                    }),
-                    Box::new(RectBullet {
-                        rect: Rectangle {
-                            x: cannons_x,
-                            y: cannon2_y,
-                            w: BULLET_W,
-                            h: BULLET_H,
-                        }
-                    }),
-                ],
-
-            CannonType::SineBullet { amplitude, angular_vel } =>
-                vec![
-                    Box::new(SineBullet {
-                        pos_x: cannons_x,
-                        origin_y: cannon1_y,
-                        amplitude: amplitude,
-                        angular_vel: angular_vel,
-                        total_time: 0.0,
-                    }),
-                    Box::new(SineBullet {
-                        pos_x: cannons_x,
-                        origin_y: cannon2_y,
-                        amplitude: amplitude,
-                        angular_vel: angular_vel,
-                        total_time: 0.0,
-                    }),
-                ],
-
-            CannonType::DivergentBullet { a, b } =>
-                vec![
-                    Box::new(DivergentBullet {
-                        pos_x: cannons_x,
-                        origin_y: cannon1_y,
-                        a: -a,
-                        b: b,
-                        total_time: 0.0,
-                    }),
-                    Box::new(DivergentBullet {
-                        pos_x: cannons_x,
-                        origin_y: cannon2_y,
-                        a: a,
-                        b: b,
-                        total_time: 0.0,
-                    }),
-                ]
-        }
-    }
-}
-
-trait Bullet {
-    // Update the bullet
-    fn update(self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>>;
-
-    // Render the bullet to the screen
-    fn render(&self, phi: &mut Phi);
-
-    // Return the bullet's bounding box
-    fn rect(&self) -> Rectangle;
-}
-
-struct RectBullet {
-    rect: Rectangle,
-}
-
-impl RectBullet {
-    fn new(x: f64, y: f64) -> RectBullet {
-        RectBullet {
-            rect: Rectangle {
-                x: x,
-                y: y,
-                w: BULLET_W,
-                h: BULLET_H,
+        for y in 0..3 {
+            for x in 0..3 {
+                sprites.push(spritesheet.region(Rectangle {
+                    w: PLAYER_W,
+                    h: PLAYER_H,
+                    x: PLAYER_W * x as f64,
+                    y: PLAYER_H * y as f64,
+                }).unwrap());
             }
         }
-    }
-}
 
-impl Bullet for RectBullet {
-    fn update(mut self: Box<Self>, phi: &mut Phi, dt: f64) -> Option<Box<Bullet>> {
-        let (w, _) = phi.output_size();
-        self.rect.x += BULLET_SPEED * dt;
-
-        // If the bullet has left the screen, then delete it
-        if self.rect.x > w {
-            None
-        } else {
-            Some(self)
+        Player {
+            // Spawn the player at the center of the screen, vertically
+            rect: Rectangle {
+                x: 64.0,
+                y: (phi.output_size().1 - PLAYER_H) / 2.0,
+                w: PLAYER_W,
+                h: PLAYER_H,
+            },
+            sprites: sprites,
+            current: PlayerFrame::MidNorm,
+            cannon: CannonType::RectBullet,
         }
     }
 
-    // Render the bullet to the screen
-    fn render(&self, phi: &mut Phi) {
-        phi.renderer.set_draw_color(Color::RGB(230, 230, 30)); // bullet is yellow
-        phi.renderer.fill_rect(self.rect.to_sdl().unwrap());
+    pub fn update(&mut self, phi: &mut Phi, elapsed: f64) {
+        // Change the player's cannons
+
+        if phi.events.now.key_1 == Some(true) {
+            self.cannon = CannonType::RectBullet;
+        }
+
+        if phi.events.now.key_2 == Some(true) {
+            self.cannon = CannonType::SineBullet {
+                amplitude: 10.0,
+                angular_vel: 15.0,
+            };
+        }
+
+        if phi.events.now.key_3 == Some(true) {
+            self.cannon = CannonType::DivergentBullet {
+                a: 100.0,
+                b: 1.2,
+            };
+        }
+
+        // Move the player's ship
+
+        let diagonal =
+            (phi.events.key_up ^ phi.events.key_down) &&
+            (phi.events.key_left ^ phi.events.key_right);
+
+        let moved =
+            if diagonal { 1.0 / 2.0f64.sqrt() }
+            else { 1.0 } * PLAYER_SPEED * elapsed;
+
+        let dx = match (phi.events.key_left, phi.events.key_right) {
+            (true, true) | (false, false) => 0.0,
+            (true, false) => -moved,
+            (false, true) => moved,
+        };
+
+        let dy = match (phi.events.key_up, phi.events.key_down) {
+            (true, true) | (false, false) => 0.0,
+            (true, false) => -moved,
+            (false, true) => moved,
+        };
+
+        self.rect.x += dx;
+        self.rect.y += dy;
+
+        // The movable region spans the entire height of the window and 70% of its width
+        let movable_region = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            w: phi.output_size().0 as f64 * 0.70,
+            h: phi.output_size().1 as f64,
+        };
+
+        // They player should fit in the screen, else abort
+        self.rect = self.rect.move_inside(movable_region).unwrap();
+
+        // Select the appropriate sprite of the ship to show
+        self.current =
+            if dx == 0.0 && dy < 0.0 { PlayerFrame::UpNorm }
+            else if dx > 0.0 && dy < 0.0 { PlayerFrame::UpFast }
+            else if dx < 0.0 && dy < 0.0 { PlayerFrame::UpSlow }
+            else if dx == 0.0 && dy == 0.0 { PlayerFrame::MidNorm }
+            else if dx > 0.0 && dy == 0.0 { PlayerFrame::MidFast }
+            else if dx < 0.0 && dy == 0.0 { PlayerFrame::MidSlow }
+            else if dx == 0.0 && dy > 0.0 { PlayerFrame::DownNorm }
+            else if dx > 0.0 && dy > 0.0 { PlayerFrame::DownFast }
+            else if dx < 0.0 && dy > 0.0 { PlayerFrame::DownSlow }
+            else { unreachable!() };
     }
 
-    // Return the bullet's bounding box
-    fn rect(&self) -> Rectangle {
-        self.rect
+    pub fn render(&self, phi: &mut Phi) {
+        // Render the bounding box for debugging purposes
+        if DEBUG {
+            phi.renderer.set_draw_color(Color::RGB(200, 200, 50));
+            phi.renderer.fill_rect(self.rect.to_sdl().unwrap());
+        }
+
+        // Render the ship's current sprite
+        phi.renderer.copy_sprite(
+            &self.sprites[self.current as usize],
+            self.rect);
+    }
+
+    pub fn spawn_bullets(&self) -> Vec<Box<Bullet>> {
+        let cannons_x = self.rect.x + 30.0;
+        let cannon1_y = self.rect.y + 6.0;
+        let cannon2_y = self.rect.y + PLAYER_H - 10.0;
+
+        spawn_bullets(self.cannon, cannons_x, cannon1_y, cannon2_y)
     }
 }
 
@@ -265,25 +177,6 @@ struct Asteroid {
 }
 
 impl Asteroid {
-/*
-    fn new(phi: &mut Phi) -> Asteroid {
-        let mut asteroid = 
-            Asteroid {
-                sprite: Asteroid::get_sprite(phi, 15.0),
-                rect: Rectangle {
-                    w: 0.0,
-                    h: 0.0,
-                    x: 0.0,
-                    y: 0.0,
-                },
-                vel: 0.0,
-            };
-
-        asteroid.reset(phi);
-        asteroid
-    }
-*/
-
     fn factory(phi: &mut Phi) -> AsteroidFactory {
         AsteroidFactory {
             sprite: AnimatedSprite::with_fps(
@@ -312,31 +205,6 @@ impl Asteroid {
 
         self.vel = ::rand::random::<f64>().abs() * 100.0 + 50.0;
     }
-
-/*
-    fn get_sprite(phi: &mut Phi, fps: f64) -> AnimatedSprite {
-        let asteroid_spritesheet = Sprite::load(&mut phi.renderer, ASTEROID_PATH).unwrap();
-        let mut asteroid_sprites = Vec::with_capacity(ASTEROIDS_TOTAL);
-
-        for yth in 0..ASTEROIDS_HIGH {
-            for xth in 0..ASTEROIDS_WIDE {
-                if ASTEROIDS_WIDE * yth + xth >= ASTEROIDS_TOTAL {
-                    break;
-                }
-
-                asteroid_sprites.push(
-                    asteroid_spritesheet.region(Rectangle {
-                        w: ASTEROID_SIDE,
-                        h: ASTEROID_SIDE,
-                        x: ASTEROID_SIDE * xth as f64,
-                        y: ASTEROID_SIDE * yth as f64,
-                    }).unwrap());
-            }
-        }
-
-        AnimatedSprite::with_fps(asteroid_sprites, fps)
-    }
-*/
 
     fn update(mut self, dt: f64) -> Option<Asteroid> {
         self.rect.x -= dt * self.vel;
@@ -448,7 +316,7 @@ impl ExplosionFactory {
 }
 
 pub struct GameView {
-    player: Ship,
+    player: Player,
     bullets: Vec<Box<Bullet>>,
     asteroids: Vec<Asteroid>,
     asteroid_factory: AsteroidFactory,
@@ -458,42 +326,9 @@ pub struct GameView {
 }
 
 impl GameView {
-    // We temporarily keep this so that we can instanciate 'GameView' in
-    // 'main' while developing it further
-    #[allow(dead_code)]
-    pub fn new(phi: &mut Phi) -> GameView {
-        let bg = BgSet::new(&mut phi.renderer);
-        GameView::with_backgrounds(phi, bg)
-    }
-
     pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> GameView {
-        let spritesheet = Sprite::load(&mut phi.renderer, "assets/spaceship.png").unwrap();
-        let mut sprites = Vec::with_capacity(9);
-
-        for y in 0..3 {
-            for x in 0..3 {
-                sprites.push(spritesheet.region(Rectangle {
-                    w: SHIP_W,
-                    h: SHIP_H,
-                    x: SHIP_W * x as f64,
-                    y: SHIP_H * y as f64,
-                }).unwrap());
-            }
-        }
-
         GameView {
-            player: Ship {
-                rect: Rectangle {
-                    x: 64.0,
-                    y: 64.0,
-                    w: SHIP_W,
-                    h: SHIP_H,
-                },
-                sprites: sprites,
-                current: ShipFrame::MidNorm,
-                cannon: CannonType::RectBullet, // RectBullet is default bullet type
-            },
-
+            player: Player::new(phi),
             bullets: vec![],
             asteroids: vec![],
             asteroid_factory: Asteroid::factory(phi),
@@ -516,68 +351,8 @@ impl View for GameView {
                         phi, self.bg.clone())));
         }
 
-        // Change player's cannons
-
-        if phi.events.now.key_1 == Some(true) {
-            self.player.cannon = CannonType::RectBullet;
-        }
-
-        if phi.events.now.key_2 == Some(true) {
-            self.player.cannon = CannonType::SineBullet {
-                amplitude: 10.0,
-                angular_vel: 15.0,
-            };
-        }
-
-        if phi.events.now.key_3 == Some(true) {
-            self.player.cannon = CannonType::DivergentBullet {
-                a: 100.0,
-                b: 1.2,
-            };
-        }
-
-        // Move the player's ship
-
-        let diagonal = (phi.events.key_up ^ phi.events.key_down) && (phi.events.key_left ^ phi.events.key_right);
-
-        let moved = if diagonal { 1.0 / 2.0f64.sqrt() } else { 1.0 } * PLAYER_SPEED * elapsed;
-
-        let dx = match (phi.events.key_left, phi.events.key_right) {
-            (true, true) | (false, false) => 0.0,
-            (true, false) => -moved,
-            (false, true) => moved,
-        };
-
-        let dy = match (phi.events.key_up, phi.events.key_down) {
-            (true, true) | (false, false) => 0.0,
-            (true, false) => -moved,
-            (false, true) => moved,
-        };
-
-        self.player.rect.x += dx;
-        self.player.rect.y += dy;
-
-        let movable_region = Rectangle {
-            x: 0.0,
-            y: 0.0,
-            w: phi.output_size().0 as f64 * 0.70,
-            h: phi.output_size().1 as f64,
-        };
-
-        self.player.rect = self.player.rect.move_inside(movable_region).unwrap();
-
-        // Select the appropriate sprite of the ship to show
-        self.player.current =
-            if dx == 0.0 && dy < 0.0 { ShipFrame::UpNorm }
-            else if dx > 0.0 && dy < 0.0 { ShipFrame::UpFast }
-            else if dx < 0.0 && dy < 0.0 { ShipFrame::UpSlow }
-            else if dx == 0.0 && dy == 0.0 { ShipFrame::MidNorm }
-            else if dx > 0.0 && dy == 0.0 { ShipFrame::MidFast }
-            else if dx < 0.0 && dy == 0.0 { ShipFrame::MidSlow }
-            else if dx == 0.0 && dy > 0.0 { ShipFrame::DownNorm }
-            else if dx > 0.0 && dy > 0.0 { ShipFrame::DownFast }
-            else if dx < 0.0 && dy > 0.0 { ShipFrame::DownSlow }
-            else { unreachable!() };
+        // Update the player
+        self.player.update(phi, elapsed);
 
         // Update the bullets
         let old_bullets = ::std::mem::replace(&mut self.bullets, vec![]);
@@ -644,7 +419,7 @@ impl View for GameView {
             .collect();
 
         if !player_alive {
-            println!("The player's ship has been destroid");
+            println!("The player's Player has been destroid");
         }
 
         // Allow the player to shoot after the bullets are updated
@@ -672,8 +447,13 @@ impl View for GameView {
             phi.renderer.fill_rect(self.player.rect.to_sdl().unwrap());
         }
 
-        // Render the ship
+        // Render the Player
         phi.renderer.copy_sprite(&self.player.sprites[self.player.current as usize], self.player.rect);
+
+
+        // Render the entities
+
+        self.player.render(phi);
 
         // Render the bullets
         for bullet in &self.bullets {

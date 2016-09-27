@@ -257,6 +257,7 @@ struct Asteroid {
 }
 
 impl Asteroid {
+/*
     fn new(phi: &mut Phi) -> Asteroid {
         let mut asteroid = 
             Asteroid {
@@ -272,6 +273,32 @@ impl Asteroid {
 
         asteroid.reset(phi);
         asteroid
+    }
+*/
+
+    fn factory(phi: &mut Phi) -> AsteroidFactory {
+        let asteroid_spritesheet = Sprite::load(&mut phi.renderer, ASTEROID_PATH).unwrap();
+        let mut asteroid_sprites = Vec::with_capacity(ASTEROIDS_TOTAL);
+
+        for yth in 0..ASTEROIDS_HIGH {
+            for xth in 0..ASTEROIDS_WIDE {
+                if ASTEROIDS_WIDE * yth + xth >= ASTEROIDS_TOTAL {
+                    break;
+                }
+
+                asteroid_sprites.push(
+                    asteroid_spritesheet.region(Rectangle {
+                        w: ASTEROID_SIDE,
+                        h: ASTEROID_SIDE,
+                        x: ASTEROID_SIDE * xth as f64,
+                        y: ASTEROID_SIDE * yth as f64,
+                    }).unwrap());
+            }
+        }
+
+        AsteroidFactory {
+            sprite: AnimatedSprite::with_fps(asteroid_sprites, 1.0),
+        }
     }
 
     fn reset(&mut self, phi: &mut Phi) {
@@ -289,6 +316,7 @@ impl Asteroid {
         self.vel = ::rand::random::<f64>().abs() * 100.0 + 50.0;
     }
 
+/*
     fn get_sprite(phi: &mut Phi, fps: f64) -> AnimatedSprite {
         let asteroid_spritesheet = Sprite::load(&mut phi.renderer, ASTEROID_PATH).unwrap();
         let mut asteroid_sprites = Vec::with_capacity(ASTEROIDS_TOTAL);
@@ -311,25 +339,67 @@ impl Asteroid {
 
         AnimatedSprite::with_fps(asteroid_sprites, fps)
     }
+*/
 
-    fn update(&mut self, phi: &mut Phi, dt: f64) {
+    fn update(mut self, dt: f64) -> Option<Asteroid> {
         self.rect.x -= dt * self.vel;
         self.sprite.add_time(dt);
 
         if self.rect.x <= -ASTEROID_SIDE {
-            self.reset(phi);
+            None
+        } else {
+            Some(self)
         }
     }
 
-    fn render(&mut self, phi: &mut Phi) {
+    fn render(&self, phi: &mut Phi) {
+        if DEBUG {
+            // Render the bounding box
+            phi.renderer.set_draw_color(Color::RGB(200, 200, 50));
+            phi.renderer.fill_rect(self.rect().to_sdl().unwrap());
+        }
+
         phi.renderer.copy_sprite(&self.sprite, self.rect);
+    }
+
+    fn rect(&self) -> Rectangle {
+        self.rect
+    }
+}
+
+struct AsteroidFactory {
+    sprite: AnimatedSprite,
+}
+
+impl AsteroidFactory {
+    fn random(&self, phi: &mut Phi) -> Asteroid {
+        let (w, h) = phi.output_size();
+
+        // FPS in [10.0, 30.0]
+        let mut sprite = self.sprite.clone();
+        sprite.set_fps(::rand::random::<f64>().abs() * 20.0 + 10.0);
+
+        Asteroid {
+            sprite: sprite,
+
+            rect: Rectangle {
+                w: ASTEROID_SIDE,
+                h: ASTEROID_SIDE,
+                x: w,
+                y: ::rand::random::<f64>().abs() * (h - ASTEROID_SIDE),
+            },
+
+            // vel in [50.0, 150.0]
+            vel: ::rand::random::<f64>().abs() * 100.0 + 50.0,
+        }
     }
 }
 
 pub struct GameView {
     player: Ship,
     bullets: Vec<Box<Bullet>>,
-    asteroid: Asteroid,
+    asteroids: Vec<Asteroid>,
+    asteroid_factory: AsteroidFactory,
     bg: BgSet,
 }
 
@@ -371,7 +441,8 @@ impl GameView {
             },
 
             bullets: vec![],
-            asteroid: Asteroid::new(phi),
+            asteroids: vec![],
+            asteroid_factory: Asteroid::factory(phi),
             bg: bg,
         }
     }
@@ -459,10 +530,20 @@ impl View for GameView {
             .collect();
 
         // Update the asteroid
-        self.asteroid.update(phi, elapsed);
+        self.asteroids =
+            ::std::mem::replace(&mut self.asteroids, vec![])
+            .into_iter()
+            .filter_map(|asteroid| asteroid.update(elapsed))
+            .collect();
 
+        // Allow the player to shoot after the bullets are updated
         if phi.events.now.key_space == Some(true) {
             self.bullets.append(&mut self.player.spawn_bullets());
+        }
+
+        // Randomly create an asteroid about once every 100 frames, ~2 seconds
+        if ::rand::random::<usize>() % 100 == 0 {
+            self.asteroids.push(self.asteroid_factory.random(phi));
         }
 
         // Clear the screen
@@ -489,7 +570,9 @@ impl View for GameView {
         }
 
         // Render the asteroid
-        self.asteroid.render(phi);
+        for asteroid in &self.asteroids {
+            asteroid.render(phi);
+        }
 
         // Render the foreground
         self.bg.front.render(&mut phi.renderer, elapsed);

@@ -1,5 +1,5 @@
 use phi::{Phi, View, ViewAction};
-use phi::data::Rectangle;
+use phi::data::{MaybeAlive, Rectangle};
 use phi::gfx::{AnimatedSprite, CopySprite, Sprite};
 use sdl2::pixels::Color;
 use views::shared::BgSet;
@@ -535,6 +535,50 @@ impl View for GameView {
             .into_iter()
             .filter_map(|asteroid| asteroid.update(elapsed))
             .collect();
+
+        // Collision detection
+
+        let mut player_alive = true;
+
+        let mut transition_bullets: Vec<_> =
+            ::std::mem::replace(&mut self.bullets, vec![])
+            .into_iter()
+            .map(|bullet| MaybeAlive { alive: true, value: bullet })
+            .collect();
+
+        self.asteroids =
+            ::std::mem::replace(&mut self.asteroids, vec![])
+            .into_iter()
+            .filter_map(|asteroid| {
+                let mut asteroid_alive = true;
+
+                for bullet in &mut transition_bullets {
+                    if asteroid.rect().overlaps(bullet.value.rect()) {
+                        asteroid_alive = false;
+                        bullet.alive = false;
+                    }
+                }
+
+                if asteroid.rect().overlaps(self.player.rect) {
+                    asteroid_alive = false;
+                    player_alive = false;
+                }
+
+                if asteroid_alive {
+                    Some(asteroid)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        self.bullets = transition_bullets.into_iter()
+            .filter_map(MaybeAlive::as_option)
+            .collect();
+
+        if !player_alive {
+            println!("The player's ship has been destroid");
+        }
 
         // Allow the player to shoot after the bullets are updated
         if phi.events.now.key_space == Some(true) {

@@ -11,13 +11,16 @@ pub struct Background {
 }
 
 impl Background {
-    pub fn render(&mut self, renderer: &mut Renderer, elapsed: f64) {
+    pub fn update(&mut self, elapsed: f64) {
         let size = self.sprite.size();
         self.pos += self.vel * elapsed;
         if self.pos > size.0 {
             self.pos -= size.0;
         }
+    }
 
+    pub fn render(&self, renderer: &mut Renderer) {
+        let size = self.sprite.size();
         let (win_w, win_h) = renderer.output_size().unwrap();
         let scale = win_h as f64 / size.1;
 

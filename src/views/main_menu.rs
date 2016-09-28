@@ -40,7 +40,7 @@ impl MainMenuView {
         MainMenuView {
             actions: vec![
                 Action::new(phi, "New Game", Box::new(|phi, bg| {
-                    ViewAction::ChangeView(Box::new(::views::game::GameView::with_backgrounds(phi, bg)))
+                    ViewAction::Render(Box::new(::views::game::GameView::with_backgrounds(phi, bg)))
                 })),
                 Action::new(phi, "Quit", Box::new(|_, _| {
                     ViewAction::Quit
@@ -53,7 +53,7 @@ impl MainMenuView {
 }
 
 impl View for MainMenuView {
-    fn render(&mut self, phi: &mut Phi, elapsed: f64) -> ViewAction {
+    fn update(mut self: Box<Self>, phi: &mut Phi, elapsed: f64) -> ViewAction {
         if phi.events.now.quit || phi.events.now.key_escape == Some(true) {
             return ViewAction::Quit;
         }
@@ -79,14 +79,23 @@ impl View for MainMenuView {
             }
         }
 
+        // Update the backgrounds
+        self.bg.back.update(elapsed);
+        self.bg.middle.update(elapsed);
+        self.bg.front.update(elapsed);
+
+        ViewAction::Render(self)
+    }
+
+    fn render(&self, phi: &mut Phi) {
         // Clear the screen
         phi.renderer.set_draw_color(Color::RGB(0, 0, 0));
         phi.renderer.clear();
 
         // Render the backgrounds
-        self.bg.back.render(&mut phi.renderer, elapsed);
-        self.bg.middle.render(&mut phi.renderer, elapsed);
-        self.bg.front.render(&mut phi.renderer, elapsed);
+        self.bg.back.render(&mut phi.renderer);
+        self.bg.middle.render(&mut phi.renderer);
+        self.bg.front.render(&mut phi.renderer);
 
         // Definitions for the menu's layout
         let (win_w, win_h) = phi.output_size();
@@ -134,8 +143,6 @@ impl View for MainMenuView {
                 });
             }
         }
-
-        ViewAction::None
     }
 }
 

@@ -56,21 +56,6 @@ impl<'window> Phi<'window> {
 
     // Renders a string of text as a sprite using the provided parameters
     pub fn ttf_str_sprite(&mut self, text: &str, font_path: &'static str, size: i32, color: Color) -> Option<Sprite> {
-/*
-        if let Some(font) = self.cached_fonts.get(&(font_path, size)) {
-            return font.render(text).blended(color).ok()
-                .and_then(|surface| self.renderer.create_texture_from_surface(&surface).ok())
-                .map(Sprite::new)
-        }
-
-        let ttf_context = ::sdl2_ttf::init().unwrap();
-        ttf_context.load_font(Path::new(font_path), size as u16).ok()
-            .and_then(|font| {
-                self.cached_fonts.insert((font_path, size), font);
-                self.ttf_str_sprite(text, font_path, size, color)
-            })
-*/
-
         let ttf_context = ::sdl2_ttf::init().unwrap();
         let mut font = ttf_context.load_font(Path::new(font_path), size as u16).unwrap();
         font.render(text).blended(color).ok()
@@ -95,13 +80,13 @@ impl<'window> Phi<'window> {
 }
 
 pub enum ViewAction {
-    None,
+    Render(Box<View>),
     Quit,
-    ChangeView(Box<View>),
 }
 
 pub trait View {
-    fn render(&mut self, context: &mut Phi, elapsed: f64) -> ViewAction;
+    fn update(self: Box<Self>, context: &mut Phi, elapsed: f64) -> ViewAction;
+    fn render(&self, context: &mut Phi);
 }
 
 pub fn spawn<F>(title: &str, init: F)
@@ -165,10 +150,14 @@ where F: Fn(&mut Phi) -> Box<View> {
 
         context.events.pump(&mut context.renderer);
 
-        match current_view.render(&mut context, elapsed) {
-            ViewAction::None => context.renderer.present(),
-            ViewAction::Quit => break,
-            ViewAction::ChangeView(new_view) => current_view = new_view,
+        match current_view.update(&mut context, elapsed) {
+            ViewAction::Render(view) => {
+                current_view = view;
+                current_view.render(&mut context);
+                context.renderer.present();
+            },
+            ViewAction::Quit =>
+                break,
         }
     }
 }

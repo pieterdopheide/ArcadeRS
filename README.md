@@ -10,9 +10,9 @@ Having all sdl2 dependencies on the same version to prevent errors.
 * Explosions don't (always) appear at the location of the destroyed asteroid
 * Escape key doesn't bring you back to the main menu
 
-Background Music by: MDK
-Song Title: Phoenix
-http://www.facebook.com/MDKOfficial
-http://www.youtube.com/MDKOfficialYT
-Buy the song here: http://www.mdkofficial.bandcamp.com/
-Free Download: http://www.morgandavidking.com/free-downloads
+Background Music by: MDK<br/>
+Song Title: Phoenix<br/>
+http://www.facebook.com/MDKOfficial<br/>
+http://www.youtube.com/MDKOfficialYT<br/>
+Buy the song here: http://www.mdkofficial.bandcamp.com/<br/>
+Free Download: http://www.morgandavidking.com/free-downloads<br/>

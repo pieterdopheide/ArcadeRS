@@ -2,7 +2,7 @@ use phi::{Phi, View, ViewAction};
 use phi::data::{MaybeAlive, Rectangle};
 use phi::gfx::{AnimatedSprite, AnimatedSpriteDescr, CopySprite, Sprite};
 use sdl2::pixels::Color;
-use sdl2_mixer::Music;
+use sdl2_mixer::{Chunk, Music};
 use views::shared::BgSet;
 use views::bullets::*;
 use std::path::Path;
@@ -326,6 +326,8 @@ pub struct GameView {
     explosion_factory: ExplosionFactory,
     bg: BgSet,
     music: Music,
+    bullet_sound: Chunk,
+    explosion_sound: Chunk,
 }
 
 impl GameView {
@@ -336,6 +338,14 @@ impl GameView {
 
         music.play(-1).unwrap();
 
+        let bullet_sound =
+            Chunk::from_file(Path::new("assets/bullet.ogg"))
+            .unwrap();
+
+        let explosion_sound =
+            Chunk::from_file(Path::new("assets/explosion.ogg"))
+            .unwrap();
+
         GameView {
             player: Player::new(phi),
             bullets: vec![],
@@ -345,6 +355,8 @@ impl GameView {
             explosion_factory: Explosion::factory(phi),
             bg: bg,
             music: music,
+            bullet_sound: bullet_sound,
+            explosion_sound: explosion_sound,
         }
     }
 }
@@ -419,6 +431,9 @@ impl View for GameView {
                     self.explosions.push(
                         self.explosion_factory.at_center(
                             asteroid.rect().center()));
+
+                    phi.play_sound(&self.explosion_sound);
+
                     None
                 }
             })
@@ -435,6 +450,7 @@ impl View for GameView {
         // Allow the player to shoot after the bullets are updated
         if phi.events.now.key_space == Some(true) {
             self.bullets.append(&mut self.player.spawn_bullets());
+            phi.play_sound(&self.bullet_sound);
         }
 
         // Randomly create an asteroid about once every 100 frames, ~2 seconds

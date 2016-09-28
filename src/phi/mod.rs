@@ -32,14 +32,19 @@ pub struct Phi<'window> {
     pub events: Events,
     pub renderer: Renderer<'window>,
 
+    allocated_channels: isize,
     cached_fonts: HashMap<(&'static str, i32), ::sdl2_ttf::Font>,
 }
 
 impl<'window> Phi<'window> {
     fn new(events: Events, renderer: Renderer<'window>) -> Phi<'window> {
+        let allocated_channels = 32;
+        ::sdl2_mixer::allocate_channels(allocated_channels);
+
         Phi {
             events: events,
             renderer: renderer,
+            allocated_channels: allocated_channels,
             cached_fonts: HashMap::new(),
         }
     }
@@ -71,6 +76,21 @@ impl<'window> Phi<'window> {
         font.render(text).blended(color).ok()
             .and_then(|surface| self.renderer.create_texture_from_surface(&surface).ok())
             .map(Sprite::new)
+    }
+
+    // Play a sound once, and allocate new channels if this is necessary
+    pub fn play_sound(&mut self, sound: &::sdl2_mixer::Chunk) {
+        // Attempt to play the sound once
+        match ::sdl2_mixer::Channel::all().play(sound, 0) {
+            Err(_) => {
+                // If there weren't enough channels allocated, then double the number and try again
+                self.allocated_channels *= 2;
+                ::sdl2_mixer::allocate_channels(self.allocated_channels);
+                self.play_sound(sound);
+            },
+
+            _ => { /* Everything's alright! */ }
+        }
     }
 }
 

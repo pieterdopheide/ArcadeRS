@@ -92,6 +92,10 @@ where F: Fn(&mut Phi) -> Box<View> {
     let mut timer = sdl_context.timer().unwrap();
     let _image_context = ::sdl2_image::init(::sdl2_image::INIT_PNG).unwrap();
 //    let _ttf_context = ::sdl2_ttf::init().unwrap();
+    let _mixer_context = ::sdl2_mixer::init(::sdl2_mixer::INIT_OGG).unwrap();
+
+    ::sdl2_mixer::open_audio(44100, ::sdl2_mixer::AUDIO_S16LSB, 2, 1024).unwrap();
+    ::sdl2_mixer::allocate_channels(32);
 
     // Create the window
     let window = video.window("ArcadeRS Shooter", 800, 600)

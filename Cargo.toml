@@ -4,8 +4,9 @@ version = "0.1.0"
 authors = ["Pieter Dopheide <you@example.com>"]
 
 [dependencies]
+rand = "0.3"
 sdl2 = "0.23"
 sdl2_image = "0.23.0"
+sdl2_mixer = "0.23.1"
 sdl2_ttf = "0.23.0"
-rand = "0.3"
 

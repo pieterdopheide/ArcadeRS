@@ -2,8 +2,10 @@ use phi::{Phi, View, ViewAction};
 use phi::data::{MaybeAlive, Rectangle};
 use phi::gfx::{AnimatedSprite, AnimatedSpriteDescr, CopySprite, Sprite};
 use sdl2::pixels::Color;
+use sdl2_mixer::Music;
 use views::shared::BgSet;
 use views::bullets::*;
+use std::path::Path;
 
 const PLAYER_SPEED: f64 = 180.0;
 const PLAYER_PATH: &'static str = "assets/spaceship.png";
@@ -323,10 +325,17 @@ pub struct GameView {
     explosions: Vec<Explosion>,
     explosion_factory: ExplosionFactory,
     bg: BgSet,
+    music: Music,
 }
 
 impl GameView {
     pub fn with_backgrounds(phi: &mut Phi, bg: BgSet) -> GameView {
+        let music =
+            Music::from_file(Path::new("assets/mdk_phoenix_orchestral.ogg"))
+            .unwrap();
+
+        music.play(-1).unwrap();
+
         GameView {
             player: Player::new(phi),
             bullets: vec![],
@@ -335,6 +344,7 @@ impl GameView {
             explosions: vec![],
             explosion_factory: Explosion::factory(phi),
             bg: bg,
+            music: music,
         }
     }
 }

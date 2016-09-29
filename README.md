@@ -7,8 +7,8 @@ Changed the version of the sdl2 dependency to 0.23.0, the latest version, and di
 Having all sdl2 dependencies on the same version to prevent errors. 
 
 ##### TODO/Issues:
-* Explosions don't (always) appear at the location of the destroyed asteroid
-* Escape key doesn't bring you back to the main menu
+* ~~Explosions don't (always) appear at the location of the destroyed asteroid~~
+* ~~Escape key doesn't bring you back to the main menu~~
 
 Background Music by: MDK<br/>
 Song Title: Phoenix<br/>

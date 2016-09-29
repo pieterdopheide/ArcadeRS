@@ -367,6 +367,10 @@ impl View for GameView {
             return ViewAction::Quit;
         }
 
+        if phi.events.now.key_escape == Some(true) {
+            return ViewAction::Render(Box::new(::views::main_menu::MainMenuView::new(phi)));
+        }
+
         {
             // We must find a new name because `self` is a reserved keyword
             // Take a reference to the content of the box (i.e. the view itself)

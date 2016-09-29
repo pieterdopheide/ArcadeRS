@@ -68,7 +68,7 @@ impl Rectangle {
     pub fn center_at(self, center: (f64, f64)) -> Rectangle {
         Rectangle {
             x: center.0 - self.w / 2.0,
-            y: center.0 - self.h / 2.0,
+            y: center.1 - self.h / 2.0,
             ..self
         }
     }
